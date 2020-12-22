@@ -119,6 +119,7 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 		errstr, errcode := getError(x.ocip.errp)
 		return nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
 	}
+	C.OCILCRFree(x.ocip.svcp,x.ocip.errp,lcr,C.OCI_DEFAULT)
 	return nil, nil
 }
 
