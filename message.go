@@ -26,6 +26,8 @@ type Insert struct {
 	SCN       scn.SCN
 	NewColumn []string
 	NewRow    []interface{}
+	Table     string
+	Owner     string
 }
 
 func (c *Insert) Scn() scn.SCN {
@@ -40,6 +42,8 @@ type Delete struct {
 	SCN       scn.SCN
 	OldColumn []string
 	OldRow    []interface{}
+	Table     string
+	Owner     string
 }
 
 func (c *Delete) Scn() scn.SCN {
@@ -55,6 +59,8 @@ type Update struct {
 	NewRow    []interface{}
 	OldColumn []string
 	OldRow    []interface{}
+	Table     string
+	Owner     string
 }
 
 func (c *Update) Scn() scn.SCN {
