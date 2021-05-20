@@ -262,6 +262,7 @@ func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType,
 	}
 }
 
+
 func value2interface(valuep *C.void, valuelen C.ub2, csid int, dtype C.ub2) interface{} {
 	switch dtype {
 	//todo support more types

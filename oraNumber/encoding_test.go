@@ -21,3 +21,8 @@ func TestFromInt(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestDecode(t *testing.T) {
+	n := FromInt(7800)
+	fmt.Println(n.AsInt())
+}

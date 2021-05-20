@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func TestMain(m *testing.M) {
+func TestM(t *testing.T) {
 	conn, err := Open(os.Getenv("XSTREAM_USER"), os.Getenv("XSTREAM_PASSWORD"),
 		os.Getenv("XSTREAM_DBNAME"), os.Getenv("XSTREAM_SERVER"))
 	if err != nil {

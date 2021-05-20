@@ -35,7 +35,7 @@ func (c *Insert) Scn() scn.SCN {
 }
 
 func (c *Insert) String() string {
-	return fmt.Sprintf("CMD: INSERT\tSCN:%s\n", c.SCN.String())
+	return fmt.Sprintf("CMD: INSERT\tSCN:%s\tcolumn:%v\tdata:%v\n", c.SCN.String(), c.NewColumn, c.NewRow)
 }
 
 type Delete struct {
