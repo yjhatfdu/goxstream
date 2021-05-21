@@ -62,7 +62,10 @@ func decodeMantissaByte(bytes []uint8, l uint8, index uint8, isNegative bool) ui
 			return 0x65 - bytes[index]
 		}
 	} else {
-		return bytes[index]
+		if bytes[index] == 0 {
+			return 0
+		}
+		return bytes[index] - 1
 	}
 }
 
@@ -114,7 +117,7 @@ func encodeMantissaByte(b uint8, isNegative bool) uint8 {
 	if isNegative {
 		return 0x65 - b
 	} else {
-		return b
+		return b + 1
 	}
 }
 
