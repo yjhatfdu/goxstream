@@ -14,7 +14,7 @@ func TestFromUint(t *testing.T) {
 	}
 }
 func TestFromInt(t *testing.T) {
-	a := int64(-12345)
+	a := int64(379644607)
 	n := FromInt(a)
 	fmt.Println(n.AsInt())
 	if n.AsInt() != a {

@@ -9,7 +9,6 @@ import "C"
 import (
 	"fmt"
 	"github.com/chai2010/cgo"
-	"github.com/yjhatfdu/goxstream/oraNumber"
 	"github.com/yjhatfdu/goxstream/scn"
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"log"
@@ -90,6 +89,18 @@ func (x *XStreamConn) Close() error {
 	C.disconnect_db(x.ocip)
 	C.free(unsafe.Pointer(x.ocip))
 	return nil
+}
+
+func ociNumberToInt(errp *C.OCIError, number *C.OCINumber) int64 {
+	var i int64
+	C.OCINumberToInt(errp, number, 8, C.OCI_NUMBER_SIGNED, unsafe.Pointer(&i))
+	return i
+}
+
+func ociNumberFromInt(errp *C.OCIError, i int64) *C.OCINumber {
+	var n C.OCINumber
+	C.OCINumberFromInt(errp, unsafe.Pointer(&i), 8, C.OCI_NUMBER_SIGNED, &n)
+	return &n
 }
 
 func (x *XStreamConn) SetSCNLwm(s scn.SCN) error {
@@ -256,14 +267,14 @@ func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType,
 			if csid_l == 0 {
 				csid_l = csid
 			}
-			colValue := value2interface(colValuep, column_alensp[i], csid_l, colDtype)
+			colValue := value2interface(ocip.errp, colValuep, column_alensp[i], csid_l, colDtype)
 			columnValues = append(columnValues, colValue)
 		}
 		return columnNames, columnValues, nil
 	}
 }
 
-func value2interface(valuep *C.void, valuelen C.ub2, csid int, dtype C.ub2) interface{} {
+func value2interface(errp *C.OCIError, valuep *C.void, valuelen C.ub2, csid int, dtype C.ub2) interface{} {
 	switch dtype {
 	//todo support more types
 	case C.SQLT_CHR, C.SQLT_AFC:
@@ -277,8 +288,7 @@ func value2interface(valuep *C.void, valuelen C.ub2, csid int, dtype C.ub2) inte
 		if v == nil {
 			return nil
 		}
-		valBytes := *(*[22]byte)(unsafe.Pointer(&v.OCINumberPart))
-		return oraNumber.Number(valBytes).AsInt()
+		return ociNumberToInt(errp, v)
 	case C.SQLT_ODT:
 		v := (*C.OCIDate)(unsafe.Pointer(valuep))
 		yy := int16(v.OCIDateYYYY)
@@ -311,18 +321,15 @@ func pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn.SCN {
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))
 		return 0
 	} else {
-		valBytes := *(*[22]byte)(unsafe.Pointer(&s.OCINumberPart))
-		return scn.SCN(oraNumber.Number(valBytes).AsInt())
+		return scn.SCN(ociNumberToInt(ocip.errp, &s))
 	}
 }
 
 func scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
-	v := oraNumber.FromUint(uint64(s))
-	var number C.struct_OCINumber
-	number.OCINumberPart = *(*[22]C.uchar)(unsafe.Pointer(&v))
+	var number *C.OCINumber = ociNumberFromInt(ocip.errp, int64(s))
 	pos := (*C.ub1)(C.calloc(33, 1))
 	var posl C.ub2
-	result := C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, &number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
+	result := C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
 	if result != C.OCI_SUCCESS {
 		// todo
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))

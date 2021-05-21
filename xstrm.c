@@ -787,27 +787,37 @@ static void init_handle(){
  OCIHandleAlloc(env, (dvoid**)&err, OCI_HTYPE_ERROR, 0, 0);
 }
 
-static sb8 get_number(){
-    OCIError * err;
-    OCINumber *n;
-    sword   status;
-    int s;
-    s=1200;
-    sword result;
-    printf("enter\n");
-    status=OCINumberFromInt(err, &s, sizeof(s), OCI_NUMBER_SIGNED,n);
-      printf("toint\n");
-//    result=OCINumberToInt(err,n,8,OCI_NUMBER_SIGNED,&s);
-//    if (result!=OCI_SUCCESS) {
+//static sb8 get_number(){
+//    OCIError * err = (OCIError *)malloc(sizeof(struct OCIError));
+//    OCINumber *n = (OCINumber *)malloc(sizeof(struct OCINumber));
+//    sword   status;
+//    sword result;
+//    long s;
+//    s = 8;
+//
+//    printf("enter\n");
+//    status = OCINumberFromInt(err, &s, sizeof(s), OCI_NUMBER_SIGNED, n);
+//    printf("toint\n");
+//
+//    long s2;
+//    result = OCINumberToInt(err, n, sizeof(s2), OCI_NUMBER_SIGNED, &s2);
+//
+//    free(err);
+//    free(n);
+//
+//    if (result != OCI_SUCCESS) {
 //        ocierror2(err,"get number err");
 //        return 0;
-//    }else{
-//        return s;
+//    } else {
+//        printf("%ld", s2);
+//        return s2;
 //    }
-return 0;
-}
-
-//int main(){
+//
+//    return 0;
+//}
+//
+//int main() {
 //    get_number();
 //    return 0;
 //}
+
