@@ -104,7 +104,7 @@ func (x *XStreamConn) SetSCNLwm(s scn.SCN) error {
 }
 
 func (x *XStreamConn) GetRecord() (Message, error) {
-	var lcr unsafe.Pointer
+	var lcr unsafe.Pointer = C.malloc(C.size_t(1))
 	var lcrType C.uchar
 	var flag C.ulong
 	var fetchlwm = (*C.uchar)(C.calloc(C.OCI_LCR_MAX_POSITION_LEN, 8))
@@ -120,6 +120,7 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 		return nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
 	}
 	C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
+	C.free(lcr)
 	return nil, nil
 }
 
@@ -261,7 +262,6 @@ func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType,
 		return columnNames, columnValues, nil
 	}
 }
-
 
 func value2interface(valuep *C.void, valuelen C.ub2, csid int, dtype C.ub2) interface{} {
 	switch dtype {
