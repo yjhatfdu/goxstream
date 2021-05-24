@@ -275,6 +275,9 @@ func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType,
 }
 
 func value2interface(errp *C.OCIError, valuep *C.void, valuelen C.ub2, csid int, dtype C.ub2) interface{} {
+	if valuelen == 0 {
+		return nil
+	}
 	switch dtype {
 	//todo support more types
 	case C.SQLT_CHR, C.SQLT_AFC:
