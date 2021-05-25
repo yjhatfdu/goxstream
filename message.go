@@ -69,3 +69,15 @@ func (c *Update) Scn() scn.SCN {
 func (c *Update) String() string {
 	return fmt.Sprintf("CMD: UPDATE\tSCN:%s\n", c.SCN.String())
 }
+
+type HeartBeat struct {
+	SCN scn.SCN
+}
+
+func (h HeartBeat) Scn() scn.SCN {
+	return h.SCN
+}
+
+func (h HeartBeat) String() string {
+	return fmt.Sprintf("CMD: HEARTBEAT\tSCN:%s\n", h.SCN.String())
+}

@@ -130,9 +130,10 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 		errstr, errcode := getError(x.ocip.errp)
 		return nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
 	}
+	s := pos2SCN(x.ocip, fetchlwm, fetchlwm_len)
 	C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
 	C.free(lcr)
-	return nil, nil
+	return HeartBeat{SCN: s}, nil
 }
 
 func tostring(p *C.uchar, l C.ushort) string {
