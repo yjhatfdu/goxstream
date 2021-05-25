@@ -133,7 +133,7 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 	s := pos2SCN(x.ocip, fetchlwm, fetchlwm_len)
 	C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
 	C.free(lcr)
-	return HeartBeat{SCN: s}, nil
+	return &HeartBeat{SCN: s}, nil
 }
 
 func tostring(p *C.uchar, l C.ushort) string {

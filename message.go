@@ -74,10 +74,10 @@ type HeartBeat struct {
 	SCN scn.SCN
 }
 
-func (h HeartBeat) Scn() scn.SCN {
+func (h *HeartBeat) Scn() scn.SCN {
 	return h.SCN
 }
 
-func (h HeartBeat) String() string {
+func (h *HeartBeat) String() string {
 	return fmt.Sprintf("CMD: HEARTBEAT\tSCN:%s\n", h.SCN.String())
 }
