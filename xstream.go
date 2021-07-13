@@ -316,6 +316,9 @@ func getError(oci_err *C.OCIError) (string, int32) {
 }
 
 func pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn.SCN {
+	if pos_len == 0 {
+		return 0
+	}
 	var s C.struct_OCINumber
 	var commit_scn C.struct_OCINumber
 	var result C.sword
