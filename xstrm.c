@@ -58,7 +58,9 @@ static void connect_db(conn_info_t *opt_params_p, oci_t ** ocip, ub2 char_csid,
                        ub2 nchar_csid);
 static void disconnect_db(oci_t * ocip);
 static void ocierror(oci_t * ocip, char * msg);
+static void ocierror0(oci_t * ocip, char * msg);
 static void attach(oci_t * ocip, conn_info_t *conn, boolean outbound);
+static int attach0(oci_t * ocip, conn_info_t *conn, boolean outbound);
 static void detach(oci_t *ocip);
 static void get_lcrs(oci_t *xin_ocip, oci_t *xout_ocip);
 static void get_chunks(oci_t *xin_ocip, oci_t *xout_ocip);
@@ -79,6 +81,18 @@ else if (OCI_ERROR==status) \
 exit(1);}\
 else {printf("Error encountered %d\n", status);\
 exit(1);}\
+} while(0)
+
+#define OCICALL0(ocip, function) do {\
+sword status=function;\
+if (OCI_SUCCESS==status) break;\
+else if (OCI_ERROR==status) \
+{ocierror0(ocip, (char *)"OCI_ERROR");\
+r=1;\
+break;}\
+else {printf("Error encountered %d\n", status);\
+r=2;\
+break;}\
 } while(0)
 
 /*---------------------------------------------------------------------
@@ -316,6 +330,45 @@ static void attach(oci_t * ocip, conn_info_t *conn, boolean outbound)
 
   ocip->attached = TRUE;
   ocip->outbound = outbound;
+}
+
+/*---------------------------------------------------------------------
+ * attach - Attach to XStream server specified in connection info
+ *---------------------------------------------------------------------*/
+static int attach0(oci_t * ocip, conn_info_t *conn, boolean outbound)
+{
+  sword       err;
+
+  printf ("Attach to XStream %s server '%.*s'\n",
+          outbound ? "outbound" : "inbound",
+          conn->svrnmlen, conn->svrnm);
+
+  if (outbound)
+  {
+    int r;
+    OCICALL0(ocip,
+            OCIXStreamOutAttach(ocip->svcp, ocip->errp, conn->svrnm,
+                              (ub2)conn->svrnmlen, (ub1 *)0, 0, OCI_DEFAULT));
+    if (r > 0) {
+        printf("attach->OCICALL error, r=%d",r);
+    } else {
+        printf("attach->OCICALL success, r=%d",r);
+    }
+
+    return r;
+  }
+  else
+  {
+    OCICALL(ocip,
+            OCIXStreamInAttach(ocip->svcp, ocip->errp, conn->svrnm,
+                               (ub2)conn->svrnmlen,
+                               (oratext *)"From_XOUT", 9,
+                               (ub1 *)0, 0, OCI_DEFAULT));
+  }
+
+  ocip->attached = TRUE;
+  ocip->outbound = outbound;
+  return 0;
 }
 
 /*---------------------------------------------------------------------
@@ -664,6 +717,27 @@ static void ocierror2(OCIError * oci_err  , char * msg)
 
   printf ("\n");
   exit(1);
+}
+
+/*---------------------------------------------------------------------
+ * ocierror0 - Print error status and return
+ *---------------------------------------------------------------------*/
+static void ocierror0(oci_t * ocip, char * msg)
+{
+  sb4 errcode=0;
+  text bufp[4096];
+
+  if (ocip->errp)
+  {
+    OCIErrorGet((dvoid *) ocip->errp, (ub4) 1, (text *) NULL, &errcode,
+                bufp, (ub4) 4096, (ub4) OCI_HTYPE_ERROR);
+    printf("%s\n%s", msg, bufp);
+  }
+  else
+    puts(msg);
+
+  printf ("\n");
+  return;
 }
 
 /*--------------------------------------------------------------------

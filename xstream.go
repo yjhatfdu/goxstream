@@ -76,7 +76,11 @@ func Open(username, password, dbname, servername string) (*XStreamConn, error) {
 	var char_csid, nchar_csid C.ushort
 	C.get_db_charsets(&info, &char_csid, &nchar_csid)
 	C.connect_db(&info, &oci, char_csid, nchar_csid)
-	C.attach(oci, &info, C.int(1))
+	r := C.attach0(oci, &info, C.int(1))
+	gr := int(r)
+	if gr > 0 {
+		return nil, fmt.Errorf("未能成功连接OCI服务器，状态码 %d", gr)
+	}
 	return &XStreamConn{
 		ocip:  oci,
 		csid:  int(char_csid),
