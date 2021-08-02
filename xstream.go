@@ -196,15 +196,27 @@ func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Mes
 			m := Commit{SCN: s}
 			return &m, nil
 		case "DELETE":
-			m := Delete{SCN: s, Table: tostring(oname, onamel), Owner: tostring(owner, ownerl)}
+			stringEnc, err := toStringEnc(oname, onamel, csid)
+			if err != nil {
+				return nil, err
+			}
+			m := Delete{SCN: s, Table: stringEnc, Owner: tostring(owner, ownerl)}
 			m.OldColumn, m.OldRow, err = getLcrRowData(ocip, lcr, valueTypeOld, csid, ncsid)
 			return &m, err
 		case "INSERT":
-			m := Insert{SCN: s, Table: tostring(oname, onamel), Owner: tostring(owner, ownerl)}
+			stringEnc, err := toStringEnc(oname, onamel, csid)
+			if err != nil {
+				return nil, err
+			}
+			m := Insert{SCN: s, Table: stringEnc, Owner: tostring(owner, ownerl)}
 			m.NewColumn, m.NewRow, err = getLcrRowData(ocip, lcr, valueTypeNew, csid, ncsid)
 			return &m, err
 		case "UPDATE":
-			m := Update{SCN: s, Table: tostring(oname, onamel), Owner: tostring(owner, ownerl)}
+			stringEnc, err := toStringEnc(oname, onamel, csid)
+			if err != nil {
+				return nil, err
+			}
+			m := Update{SCN: s, Table: stringEnc, Owner: tostring(owner, ownerl)}
 			m.OldColumn, m.OldRow, err = getLcrRowData(ocip, lcr, valueTypeOld, csid, ncsid)
 			if err != nil {
 				return nil, err
