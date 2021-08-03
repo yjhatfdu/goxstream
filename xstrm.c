@@ -85,7 +85,7 @@ exit(1);}\
 
 #define OCICALL0(ocip, function) do {\
 sword status=function;\
-if (OCI_SUCCESS==status) break;\
+if (OCI_SUCCESS==status) {r=0; break;}\
 else if (OCI_ERROR==status) \
 {ocierror0(ocip, (char *)"OCI_ERROR");\
 r=1;\
@@ -345,17 +345,13 @@ static int attach0(oci_t * ocip, conn_info_t *conn, boolean outbound)
 
   if (outbound)
   {
-    int r;
+    int r=0;
     OCICALL0(ocip,
             OCIXStreamOutAttach(ocip->svcp, ocip->errp, conn->svrnm,
                               (ub2)conn->svrnmlen, (ub1 *)0, 0, OCI_DEFAULT));
-    if (r > 0) {
-        printf("attach->OCICALL error, r=%d",r);
-    } else {
-        printf("attach->OCICALL success, r=%d",r);
+    if (r != 0) {
+        return r;
     }
-
-    return r;
   }
   else
   {
@@ -894,4 +890,3 @@ static void init_handle(){
 //    get_number();
 //    return 0;
 //}
-

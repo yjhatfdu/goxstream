@@ -77,10 +77,11 @@ func Open(username, password, dbname, servername string) (*XStreamConn, error) {
 	C.get_db_charsets(&info, &char_csid, &nchar_csid)
 	C.connect_db(&info, &oci, char_csid, nchar_csid)
 	r := C.attach0(oci, &info, C.int(1))
-	gr := int(r)
-	if gr > 0 {
-		return nil, fmt.Errorf("未能成功连接OCI服务器，状态码 %d", gr)
+	if int(r) != 0 {
+		errstr, errcode := getError(oci.errp)
+		return nil, fmt.Errorf("attach to XStream server specified in connection info failed, code:%d, %s", errcode, errstr)
 	}
+
 	return &XStreamConn{
 		ocip:  oci,
 		csid:  int(char_csid),
@@ -190,7 +191,6 @@ func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Mes
 	} else {
 		cmd := tostring(cmd_type, cmd_type_len)
 		s := pos2SCN(ocip, lpos, lposl)
-		var err error
 		switch cmd {
 		case "COMMIT":
 			m := Commit{SCN: s}
