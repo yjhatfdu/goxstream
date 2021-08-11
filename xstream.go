@@ -78,7 +78,10 @@ func Open(username, password, dbname, servername string) (*XStreamConn, error) {
 	C.connect_db(&info, &oci, char_csid, nchar_csid)
 	r := C.attach0(oci, &info, C.int(1))
 	if int(r) != 0 {
-		errstr, errcode := getError(oci.errp)
+		errstr, errcode, err := getErrorEnc(oci.errp, int(char_csid))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse oci error after calling Open function failed: %s", err.Error())
+		}
 		return nil, fmt.Errorf("attach to XStream server specified in connection info failed, code:%d, %s", errcode, errstr)
 	}
 
@@ -329,6 +332,22 @@ func getError(oci_err *C.OCIError) (string, int32) {
 	C.OCIErrorGet(unsafe.Pointer(oci_err), C.uint(1),
 		(*C.text)(unsafe.Pointer(nil)), &errCode, (*C.uchar)(unsafe.Pointer(&text)), 4096, C.OCI_HTYPE_ERROR)
 	return cgo.GoString((*cgo.Char)(unsafe.Pointer(&text))), int32(errCode)
+}
+
+func getErrorEnc(oci_err *C.OCIError, csid int) (string, int32, error) {
+	errCode := C.sb4(0)
+	text := [4096]C.text{}
+	C.OCIErrorGet(unsafe.Pointer(oci_err), C.uint(1),
+		(*C.text)(unsafe.Pointer(nil)), &errCode, (*C.uchar)(unsafe.Pointer(&text)), 4096, C.OCI_HTYPE_ERROR)
+	var l int
+	for i, c := range text {
+		if int(C.ushort(c)) == 0 {
+			l = i
+			break
+		}
+	}
+	val, err := toStringEnc((*C.uchar)(unsafe.Pointer(&text)), C.ushort(l), csid)
+	return val, int32(errCode), err
 }
 
 func pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn.SCN {
