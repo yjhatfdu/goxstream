@@ -204,7 +204,7 @@ func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Mes
 				return nil, err
 			}
 			m := Delete{SCN: s, Table: stringEnc, Owner: tostring(owner, ownerl)}
-			m.OldColumn, m.OldRow, err = getLcrRowData(ocip, lcr, valueTypeOld, csid, ncsid)
+			m.OldColumn, m.OldRow, err = getLcrRowData(ocip, lcr, valueTypeOld, csid, ncsid, m.Owner+"."+m.Table)
 			return &m, err
 		case "INSERT":
 			stringEnc, err := toStringEnc(oname, onamel, csid)
@@ -212,7 +212,7 @@ func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Mes
 				return nil, err
 			}
 			m := Insert{SCN: s, Table: stringEnc, Owner: tostring(owner, ownerl)}
-			m.NewColumn, m.NewRow, err = getLcrRowData(ocip, lcr, valueTypeNew, csid, ncsid)
+			m.NewColumn, m.NewRow, err = getLcrRowData(ocip, lcr, valueTypeNew, csid, ncsid, m.Owner+"."+m.Table)
 			return &m, err
 		case "UPDATE":
 			stringEnc, err := toStringEnc(oname, onamel, csid)
@@ -220,11 +220,11 @@ func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Mes
 				return nil, err
 			}
 			m := Update{SCN: s, Table: stringEnc, Owner: tostring(owner, ownerl)}
-			m.OldColumn, m.OldRow, err = getLcrRowData(ocip, lcr, valueTypeOld, csid, ncsid)
+			m.OldColumn, m.OldRow, err = getLcrRowData(ocip, lcr, valueTypeOld, csid, ncsid, m.Owner+"."+m.Table)
 			if err != nil {
 				return nil, err
 			}
-			m.NewColumn, m.NewRow, err = getLcrRowData(ocip, lcr, valueTypeNew, csid, ncsid)
+			m.NewColumn, m.NewRow, err = getLcrRowData(ocip, lcr, valueTypeNew, csid, ncsid, m.Owner+"."+m.Table)
 			return &m, err
 		}
 	}
@@ -236,26 +236,59 @@ type valueType C.ub2
 var valueTypeOld valueType = C.OCI_LCR_ROW_COLVAL_OLD
 var valueTypeNew valueType = C.OCI_LCR_ROW_COLVAL_NEW
 
-func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType, csid, ncsid int) ([]string, []interface{}, error) {
-	const colCount int = 256
+var ownerm = make(map[string]columnInfo)
+
+type columnInfo struct {
+	count     int
+	names     **C.oratext
+	namesLens *C.ub2
+	inDP      *C.OCIInd
+	cSetFP    *C.ub1
+	flags     *C.oraub8
+}
+
+func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType, csid, ncsid int, owner string) ([]string, []interface{}, error) {
+	const colCount = 256
+	var col_names **C.oratext
+	var col_names_lens *C.ub2
+	var column_indp *C.OCIInd
+	var column_csetfp *C.ub1
+	var column_flags *C.oraub8
+	if ci, ok := ownerm[owner]; !ok {
+		col_names = (**C.oratext)(unsafe.Pointer(cgo.NewIntN(colCount)))
+		col_names_lens = (*C.ub2)(cgo.NewUInt16N(colCount))
+		column_indp = (*C.OCIInd)(C.calloc(C.size_t(colCount), C.size_t(unsafe.Sizeof(C.OCIInd(0)))))
+		column_csetfp = (*C.ub1)(cgo.NewUInt8N(colCount))
+		column_flags = (*C.oraub8)(cgo.NewUInt64N(colCount))
+		ownerm[owner] = columnInfo{
+			count:     256,
+			names:     col_names,
+			namesLens: col_names_lens,
+			inDP:      column_indp,
+			cSetFP:    column_csetfp,
+			flags:     column_flags,
+		}
+	} else {
+		col_names = ci.names
+		col_names_lens = ci.namesLens
+		column_indp = ci.inDP
+		column_csetfp = ci.cSetFP
+		column_flags = ci.flags
+	}
+
 	var result C.sword
 	var num_cols C.ub2
-	var col_names = (**C.oratext)(unsafe.Pointer(cgo.NewIntN(colCount)))
-	var col_names_lens = (*C.ub2)(cgo.NewUInt16N(colCount))
 	var col_dtype [colCount]C.ub2
 	var column_valuesp [colCount]*C.void
-	var column_indp = (*C.OCIInd)(C.calloc(C.size_t(colCount), C.size_t(unsafe.Sizeof(C.OCIInd(0)))))
 	var column_alensp [colCount]C.ub2
-	var column_csetfp = (*C.ub1)(cgo.NewUInt8N(colCount))
-	var column_flags = (*C.oraub8)(cgo.NewUInt64N(colCount))
 	var column_csid [colCount]C.ub2
-	defer func() {
-		C.free(unsafe.Pointer(col_names))
-		C.free(unsafe.Pointer(col_names_lens))
-		C.free(unsafe.Pointer(column_indp))
-		C.free(unsafe.Pointer(column_csetfp))
-		C.free(unsafe.Pointer(column_flags))
-	}()
+	//defer func() {
+	//	C.free(unsafe.Pointer(col_names))
+	//	C.free(unsafe.Pointer(col_names_lens))
+	//	C.free(unsafe.Pointer(column_indp))
+	//	C.free(unsafe.Pointer(column_csetfp))
+	//	C.free(unsafe.Pointer(column_flags))
+	//}()
 	result = C.OCILCRRowColumnInfoGet(
 		ocip.svcp, ocip.errp,
 		C.ushort(valueType), &num_cols,
