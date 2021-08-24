@@ -11,6 +11,7 @@ import (
 	"github.com/chai2010/cgo"
 	"github.com/yjhatfdu/goxstream/scn"
 	"golang.org/x/text/encoding/simplifiedchinese"
+	"golang.org/x/text/encoding/unicode"
 	"log"
 	"reflect"
 	"time"
@@ -35,6 +36,11 @@ func init() {
 	}
 	decoders[0] = func(b []byte) (string, error) {
 		return string(b), nil
+	}
+	utf8Decoder := unicode.UTF8.NewDecoder()
+	decoders[873] = func(b []byte) (string, error) {
+		s, err := utf8Decoder.Bytes(b)
+		return string(s), err
 	}
 }
 
