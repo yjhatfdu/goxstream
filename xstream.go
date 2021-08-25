@@ -19,6 +19,13 @@ import (
 	"unsafe"
 )
 
+type OCI_LCRID_VERSION int
+
+const (
+	V1 = 1
+	V2 = 2
+)
+
 var decoders = map[int]func(b []byte) (string, error){}
 
 func init() {
@@ -55,12 +62,13 @@ func toOciStr(s string) (*C.uchar, C.uint, func()) {
 }
 
 type XStreamConn struct {
-	ocip  *C.struct_oci
-	csid  int
-	ncsid int
+	ocip     *C.struct_oci
+	csid     int
+	ncsid    int
+	lcridVer OCI_LCRID_VERSION
 }
 
-func Open(username, password, dbname, servername string) (*XStreamConn, error) {
+func Open(username, password, dbname, servername string, oracleVer int) (*XStreamConn, error) {
 	var info C.struct_conn_info
 	usernames, usernamel, free := toOciStr(username)
 	defer free()
@@ -91,10 +99,18 @@ func Open(username, password, dbname, servername string) (*XStreamConn, error) {
 		return nil, fmt.Errorf("attach to XStream server specified in connection info failed, code:%d, %s", errcode, errstr)
 	}
 
+	var version OCI_LCRID_VERSION
+	if oracleVer > 12 {
+		version = V2
+	} else {
+		oracleVer = V1
+	}
+
 	return &XStreamConn{
-		ocip:  oci,
-		csid:  int(char_csid),
-		ncsid: int(nchar_csid),
+		ocip:     oci,
+		csid:     int(char_csid),
+		ncsid:    int(nchar_csid),
+		lcridVer: version,
 	}, nil
 }
 
@@ -117,8 +133,15 @@ func ociNumberFromInt(errp *C.OCIError, i int64) *C.OCINumber {
 	return &n
 }
 
+func ToCUCharString(str string) (*C.uchar, C.ushort, func()) {
+	charString := cgo.NewCharString(str)
+	return (*C.uchar)(unsafe.Pointer(charString)), C.ushort(len(str)), func() {
+		charString.Free()
+	}
+}
+
 func (x *XStreamConn) SetSCNLwm(s scn.SCN) error {
-	pos, posl := scn2pos(x.ocip, s)
+	pos, posl := x.scn2pos(x.ocip, s)
 	defer C.free(unsafe.Pointer(pos))
 	status := C.OCIXStreamOutProcessedLWMSet(x.ocip.svcp, x.ocip.errp, pos, posl, C.OCI_DEFAULT)
 	if status == C.OCI_ERROR {
@@ -138,13 +161,13 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 	status := C.OCIXStreamOutLCRReceive(x.ocip.svcp, x.ocip.errp, &lcr, &lcrType,
 		&flag, fetchlwm, &fetchlwm_len, C.OCI_DEFAULT)
 	if status == C.OCI_STILL_EXECUTING {
-		return getLcrRecords(x.ocip, lcr, x.csid, x.ncsid)
+		return x.getLcrRecords(x.ocip, lcr, x.csid, x.ncsid)
 	}
 	if status == C.OCI_ERROR {
 		errstr, errcode := getError(x.ocip.errp)
 		return nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
 	}
-	s := pos2SCN(x.ocip, fetchlwm, fetchlwm_len)
+	s := x.pos2SCN(x.ocip, fetchlwm, fetchlwm_len)
 	C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
 	C.free(lcr)
 	return &HeartBeat{SCN: s}, nil
@@ -179,7 +202,7 @@ func tobytes(p *C.uchar, l C.ushort) []byte {
 	return ret
 }
 
-func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Message, error) {
+func (x *XStreamConn) getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Message, error) {
 	var cmd_type, owner, oname, txid *C.oratext
 	var cmd_type_len, ownerl, onamel, txidl C.ub2
 	var src_db_name **C.oratext
@@ -199,7 +222,8 @@ func getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid, ncsid int) (Mes
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))
 	} else {
 		cmd := tostring(cmd_type, cmd_type_len)
-		s := pos2SCN(ocip, lpos, lposl)
+		//pos := tostring(lpos, lposl)
+		s := x.pos2SCN(ocip, lpos, lposl)
 		switch cmd {
 		case "COMMIT":
 			m := Commit{SCN: s}
@@ -389,7 +413,7 @@ func getErrorEnc(oci_err *C.OCIError, csid int) (string, int32, error) {
 	return val, int32(errCode), err
 }
 
-func pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn.SCN {
+func (x *XStreamConn) pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn.SCN {
 	if pos_len == 0 {
 		return 0
 	}
@@ -406,12 +430,18 @@ func pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn.SCN {
 	}
 }
 
-func scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
+func (x *XStreamConn) scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
+	var status C.int
 	var number *C.OCINumber = ociNumberFromInt(ocip.errp, int64(s))
 	pos := (*C.ub1)(C.calloc(33, 1))
 	var posl C.ub2
-	result := C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
-	if result != C.OCI_SUCCESS {
+	if x.lcridVer == V1 {
+		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V1, C.OCI_DEFAULT)
+	} else {
+		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
+	}
+
+	if status != C.OCI_SUCCESS {
 		// todo
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))
 		return nil, 0
