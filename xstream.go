@@ -152,25 +152,70 @@ func (x *XStreamConn) SetSCNLwm(s scn.SCN) error {
 }
 
 func (x *XStreamConn) GetRecord() (Message, error) {
-	var lcr unsafe.Pointer = C.malloc(C.size_t(1))
-	var lcrType C.uchar
-	var flag C.ulong
-	var fetchlwm = (*C.uchar)(C.calloc(C.OCI_LCR_MAX_POSITION_LEN, 8))
-	defer C.free(unsafe.Pointer(fetchlwm))
+	var lcr = unsafe.Pointer(nil)
+	var lcrtype C.ub1
+	var flag C.oraub8
+	var fetchlwm = cgo.NewUInt8N(C.OCI_LCR_MAX_POSITION_LEN)
+	defer fetchlwm.Free()
 	var fetchlwm_len C.ushort
-	status := C.OCIXStreamOutLCRReceive(x.ocip.svcp, x.ocip.errp, &lcr, &lcrType,
-		&flag, fetchlwm, &fetchlwm_len, C.OCI_DEFAULT)
+	status := C.OCIXStreamOutLCRReceive(x.ocip.svcp, x.ocip.errp, &lcr, &lcrtype,
+		&flag, (*C.ub1)(fetchlwm), &fetchlwm_len, C.OCI_DEFAULT)
 	if status == C.OCI_STILL_EXECUTING {
-		return x.getLcrRecords(x.ocip, lcr, x.csid, x.ncsid)
+		msg, err := x.getLcrRecords(x.ocip, lcr, x.csid, x.ncsid)
+		if err != nil {
+			return nil, fmt.Errorf("failed to call getLcrRecords function %s", err.Error())
+		}
+
+		/* If LCR has chunked columns (i.e, has LOB/Long/XMLType columns) */
+		if flag != 0 && C.OCI_XSTREAM_MORE_ROW_DATA != 0 {
+			C.travel_chunks(x.ocip)
+		}
+
+		return msg, nil
 	}
 	if status == C.OCI_ERROR {
 		errstr, errcode := getError(x.ocip.errp)
 		return nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
+	} else { // status == C.SUCCESS
+		s := x.pos2SCN(x.ocip, (*C.ub1)(fetchlwm), fetchlwm_len)
+		C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
+		return &HeartBeat{SCN: s}, nil
 	}
-	s := x.pos2SCN(x.ocip, fetchlwm, fetchlwm_len)
-	C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
-	C.free(lcr)
-	return &HeartBeat{SCN: s}, nil
+}
+
+func (conn *XStreamConn) getColumnChunkData(owner string) (map[string]interface{}, error) {
+	var colname *C.oratext
+	var colname_len C.ub2
+	var coldty C.ub2
+	var col_flags C.oraub8
+	var col_csid C.ub2
+	var chunk_len C.ub4
+	var chunk_ptr *C.ub1
+	var row_flag C.oraub8
+
+	var chunkData = map[string]interface{}{}
+	status := C.OCIXStreamOutChunkReceive(conn.ocip.svcp, conn.ocip.errp,
+		&colname, &colname_len, &coldty,
+		&col_flags, &col_csid, &chunk_len,
+		&chunk_ptr, &row_flag, C.OCI_DEFAULT)
+	for status == C.OCI_SUCCESS {
+		column, _ := toStringEnc(colname, C.ushort(colname_len), conn.csid)
+		s, err := toStringEnc(chunk_ptr, C.ushort(chunk_len), conn.csid)
+		if err != nil {
+			return nil, err
+		}
+		chunkData[column] = s
+		if row_flag != 0 && C.OCI_XSTREAM_MORE_ROW_DATA != 0 {
+			status = C.OCIXStreamOutChunkReceive(conn.ocip.svcp, conn.ocip.errp,
+				&colname, &colname_len, &coldty,
+				&col_flags, &col_csid, &chunk_len,
+				&chunk_ptr, &row_flag, C.OCI_DEFAULT)
+		} else {
+			status = -1
+		}
+	}
+
+	return chunkData, nil
 }
 
 func tostring(p *C.uchar, l C.ushort) string {
@@ -222,7 +267,6 @@ func (x *XStreamConn) getLcrRecords(ocip *C.struct_oci, lcr unsafe.Pointer, csid
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))
 	} else {
 		cmd := tostring(cmd_type, cmd_type_len)
-		//pos := tostring(lpos, lposl)
 		s := x.pos2SCN(ocip, lpos, lposl)
 		switch cmd {
 		case "COMMIT":
@@ -312,13 +356,6 @@ func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType,
 	var column_valuesp [colCount]*C.void
 	var column_alensp [colCount]C.ub2
 	var column_csid [colCount]C.ub2
-	//defer func() {
-	//	C.free(unsafe.Pointer(col_names))
-	//	C.free(unsafe.Pointer(col_names_lens))
-	//	C.free(unsafe.Pointer(column_indp))
-	//	C.free(unsafe.Pointer(column_csetfp))
-	//	C.free(unsafe.Pointer(column_flags))
-	//}()
 	result = C.OCILCRRowColumnInfoGet(
 		ocip.svcp, ocip.errp,
 		C.ushort(valueType), &num_cols,

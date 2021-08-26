@@ -64,6 +64,7 @@ static int attach0(oci_t * ocip, conn_info_t *conn, boolean outbound);
 static void detach(oci_t *ocip);
 static void get_lcrs(oci_t *xin_ocip, oci_t *xout_ocip);
 static void get_chunks(oci_t *xin_ocip, oci_t *xout_ocip);
+static void travel_chunks( oci_t *xout_ocip);
 static void print_lcr(oci_t *ocip, void *lcrp, ub1 lcrtype,
                       oratext **src_db_name, ub2  *src_db_namel);
 static void print_chunk (ub1 *chunk_ptr, ub4 chunk_len, ub2 dty);
@@ -565,6 +566,39 @@ static void get_chunks(oci_t *xin_ocip, oci_t *xout_ocip)
                                   colname_len, coldty, col_flags,
                                   col_csid, chunk_len, chunk_ptr,
                                   row_flag, OCI_DEFAULT));
+
+  } while (row_flag & OCI_XSTREAM_MORE_ROW_DATA);
+}
+
+/*---------------------------------------------------------------------
+ * travel_chunks - travel each chunk for the current LCR and do nothing
+ *---------------------------------------------------------------------*/
+static void travel_chunks(oci_t *xout_ocip)
+{
+  oratext *colname;
+  ub2      colname_len;
+  ub2      coldty;
+  oraub8   col_flags;
+  ub2      col_csid;
+  ub4      chunk_len;
+  ub1     *chunk_ptr;
+  oraub8   row_flag;
+  sword    err;
+  sb4      rtncode;
+
+  int chunk_cnt = 0;
+  do
+  {
+    chunk_cnt++;
+    /* Get a chunk from outbound server */
+    OCICALL(xout_ocip,
+            OCIXStreamOutChunkReceive(xout_ocip->svcp, xout_ocip->errp,
+                                      &colname, &colname_len, &coldty,
+                                      &col_flags, &col_csid, &chunk_len,
+                                      &chunk_ptr, &row_flag, OCI_DEFAULT));
+
+    /* print chunk data */
+    /* print_chunk(chunk_ptr, chunk_len, coldty); */
 
   } while (row_flag & OCI_XSTREAM_MORE_ROW_DATA);
 }

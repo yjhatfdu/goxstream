@@ -11,8 +11,7 @@ func TestM(t *testing.T) {
 	pwd := os.Getenv("XSTREAM_PASSWORD")
 	db := os.Getenv("XSTREAM_DBNAME")
 	server := os.Getenv("XSTREAM_SERVER")
-	conn, err := Open(user, pwd,
-		db, server)
+	conn, err := Open(user, pwd, db, server, 12)
 	if err != nil {
 		log.Panic(err)
 	}
