@@ -100,10 +100,10 @@ func Open(username, password, dbname, servername string, oracleVer int) (*XStrea
 	}
 
 	var version OCI_LCRID_VERSION
-	if oracleVer > 12 {
+	if oracleVer >= 12 {
 		version = V2
 	} else {
-		oracleVer = V1
+		version = V1
 	}
 
 	return &XStreamConn{
@@ -473,7 +473,7 @@ func (x *XStreamConn) scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
 	pos := (*C.ub1)(C.calloc(33, 1))
 	var posl C.ub2
 	if x.lcridVer == V1 {
-		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V1, C.OCI_DEFAULT)
+		status = C.OCILCRSCNToPosition(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_DEFAULT)
 	} else {
 		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
 	}
