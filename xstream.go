@@ -328,27 +328,27 @@ func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType,
 	var column_indp *C.OCIInd
 	var column_csetfp *C.ub1
 	var column_flags *C.oraub8
-	if ci, ok := ownerm[owner]; !ok {
-		col_names = (**C.oratext)(unsafe.Pointer(cgo.NewIntN(colCount)))
-		col_names_lens = (*C.ub2)(cgo.NewUInt16N(colCount))
-		column_indp = (*C.OCIInd)(C.calloc(C.size_t(colCount), C.size_t(unsafe.Sizeof(C.OCIInd(0)))))
-		column_csetfp = (*C.ub1)(cgo.NewUInt8N(colCount))
-		column_flags = (*C.oraub8)(cgo.NewUInt64N(colCount))
-		ownerm[owner] = columnInfo{
-			count:     256,
-			names:     col_names,
-			namesLens: col_names_lens,
-			inDP:      column_indp,
-			cSetFP:    column_csetfp,
-			flags:     column_flags,
-		}
-	} else {
-		col_names = ci.names
-		col_names_lens = ci.namesLens
-		column_indp = ci.inDP
-		column_csetfp = ci.cSetFP
-		column_flags = ci.flags
-	}
+	//if ci, ok := ownerm[owner]; !ok {
+	//	col_names = (**C.oratext)(unsafe.Pointer(cgo.NewIntN(colCount)))
+	//	col_names_lens = (*C.ub2)(cgo.NewUInt16N(colCount))
+	//	column_indp = (*C.OCIInd)(C.calloc(C.size_t(colCount), C.size_t(unsafe.Sizeof(C.OCIInd(0)))))
+	//	column_csetfp = (*C.ub1)(cgo.NewUInt8N(colCount))
+	//	column_flags = (*C.oraub8)(cgo.NewUInt64N(colCount))
+	//	ownerm[owner] = columnInfo{
+	//		count:     256,
+	//		names:     col_names,
+	//		namesLens: col_names_lens,
+	//		inDP:      column_indp,
+	//		cSetFP:    column_csetfp,
+	//		flags:     column_flags,
+	//	}
+	//} else {
+	//	col_names = ci.names
+	//	col_names_lens = ci.namesLens
+	//	column_indp = ci.inDP
+	//	column_csetfp = ci.cSetFP
+	//	column_flags = ci.flags
+	//}
 
 	var result C.sword
 	var num_cols C.ub2
