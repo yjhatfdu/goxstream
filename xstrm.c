@@ -54,6 +54,41 @@ typedef struct oci                                            /* OCI handles */
   boolean     outbound;
 } oci_t;
 
+typedef struct oci_lcr_column_item {
+  void *column_value;
+  ub2 column_value_len;
+
+  OCIInd column_indicator;
+  ub1 column_character_set_form;
+  oraub8 column_flag;
+
+  ub2 column_csid;
+
+  u_char *column_name;
+  ub2 column_name_len;
+
+  ub2 column_data_type;
+} oci_lcr_column_item_t;
+
+typedef struct oci_lcr_row {
+  oci_lcr_column_item_t **columns;
+  ub2 length;
+} oci_lcr_row_t;
+
+static sword get_lcr_row_data(const oci_t *ocip, void *lcrp,
+                              ub2 column_value_type, oci_lcr_row_t **row,
+                              ub2 *column_length);
+
+static sword iterate_row_data(const oci_t *ocip, const oci_lcr_row_t *row,
+                              ub2 index, char **column_name,
+                              ub2 *column_name_len, void **column_value,
+                              ub2 *column_value_len, ub2 *column_csid, ub2 *column_data_type);
+
+static void free_lcr_row_data(const oci_lcr_row_t *data);
+static void free_lcr_row_item(const oci_lcr_column_item_t *item);
+
+static oci_lcr_row_t *create_lcr_row_data(ub2 length);
+
 static void connect_db(conn_info_t *opt_params_p, oci_t ** ocip, ub2 char_csid,
                        ub2 nchar_csid);
 static void disconnect_db(oci_t * ocip);
@@ -96,57 +131,114 @@ r=2;\
 break;}\
 } while(0)
 
-/*---------------------------------------------------------------------
- *                M A I N   P R O G R A M
- *---------------------------------------------------------------------*/
-//main2(int argc, char **argv)
-//{
-//  /* Outbound and inbound connection info */
-//  conn_info_t   xout_params;
-//  conn_info_t   xin_params;
-//  oci_t        *xout_ocip = (oci_t *)NULL;
-//  oci_t        *xin_ocip = (oci_t *)NULL;
-//  ub2           obdb_char_csid = 0;                 /* outbound db char csid */
-//  ub2           obdb_nchar_csid = 0;               /* outbound db nchar csid */
-//
-//  /* parse command line arguments */
-//  get_inputs(&xout_params, &xin_params, argc, argv);
-//
-//  /* Get the outbound database CHAR and NCHAR character set info */
-//  get_db_charsets(&xout_params, &obdb_char_csid, &obdb_nchar_csid);
-//
-//  /* Connect to the outbound db and set the client env to the outbound charsets
-//   * to minimize character conversion when transferring LCRs from outbound
-//   * directly to inbound server.
-//   */
-//  connect_db(&xout_params, &xout_ocip, obdb_char_csid, obdb_nchar_csid);
-//
-//  /* Attach to outbound server */
-//  attach(xout_ocip, &xout_params, TRUE);
-//
-//  /* connect to inbound db and set the client charsets the same as the
-//   * outbound db charsets.
-//   */
-//  connect_db(&xin_params, &xin_ocip, obdb_char_csid, obdb_nchar_csid);
-//
-//  /* Attach to inbound server */
-//  attach(xin_ocip, &xin_params, FALSE);
-//
-//  /* Get lcrs from outbound server and send to inbound server */
-//  get_lcrs(xin_ocip, xout_ocip);
-//
-//  /* Detach from XStream servers */
-//  detach(xout_ocip);
-//  detach(xin_ocip);
-//
-//  /* Disconnect from both databases */
-//  disconnect_db(xout_ocip);
-//  disconnect_db(xin_ocip);
-//
-//  free(xout_ocip);
-//  free(xin_ocip);
-//  exit (0);
-//}
+static void free_lcr_row_item(const oci_lcr_column_item_t *item) {
+  // free(item->value);
+  free(item->column_name);
+  free((void *)item);
+}
+
+static void free_lcr_row_data(const oci_lcr_row_t *data) {
+  if (data == 0) {
+    return;
+  }
+  for (ub2 i = 0; i < data->length; i++) {
+    free_lcr_row_item(data->columns[i]);
+    data->columns[i] = NULL;
+  }
+  free(data->columns);
+  free((void *)data);
+}
+
+static oci_lcr_row_t *create_lcr_row_data(ub2 length) {
+  oci_lcr_row_t *row = malloc(sizeof(oci_lcr_row_t));
+  row->length = length;
+  row->columns = malloc(sizeof(oci_lcr_column_item_t *) * length);
+  for (ub2 i = 0; i < length; i++) {
+    row->columns[i] =
+        (oci_lcr_column_item_t *)malloc(sizeof(oci_lcr_column_item_t));
+  }
+  return row;
+}
+
+static oratext *create_oci_text_copy(const oratext *str) {
+  oratext *copy = (oratext *)malloc(strlen((const char *)str) + 1);
+  strcpy((char *)copy, (const char *)str);
+  return copy;
+}
+
+static sword get_lcr_row_data(const oci_t *ocip, void *lcrp,
+                              ub2 column_value_type, oci_lcr_row_t **row,
+                              ub2 *column_length) {
+  *row = 0;
+
+  if (row == NULL) {
+    printf("get_lcr_row_data: %s",
+           "parameter [oci_lcr_row_t **row] must be set.");
+    return OCI_ERROR;
+  }
+
+  sword result;
+  const ub2 array_size = 1024;
+
+  ub2 num_cols;
+  ub2 column_name_lens[array_size];
+  oratext *column_names[array_size];
+  ub2 column_dtyp[array_size];
+  void *column_valuesp[array_size];
+
+  OCIInd column_indp[array_size];
+  ub2 column_alensp[array_size];
+  ub1 column_csetfp[array_size];
+  oraub8 column_flags[array_size];
+  ub2 column_csid[array_size];
+
+  result = OCILCRRowColumnInfoGet(
+      ocip->svcp, ocip->errp, column_value_type, &num_cols, column_names,
+      column_name_lens, column_dtyp, column_valuesp, column_indp, column_alensp,
+      column_csetfp, column_flags, column_csid, lcrp, array_size, OCI_DEFAULT);
+
+  if (result != OCI_SUCCESS) {
+    return result;
+  }
+
+  *row = create_lcr_row_data(num_cols);
+  *column_length = num_cols;
+
+  for (ub2 i = 0; i < num_cols; i++) {
+    oci_lcr_column_item_t *item = (*row)->columns[i];
+    item->column_data_type = column_dtyp[i];
+    item->column_name = create_oci_text_copy(column_names[i]);
+    item->column_name_len = column_name_lens[i];
+    item->column_value = column_valuesp[i];
+    item->column_value_len = column_alensp[i];
+    item->column_character_set_form = column_csetfp[i];
+    item->column_csid = column_csid[i];
+    item->column_indicator = column_indp[i];
+    item->column_flag = column_flags[i];
+  }
+
+  return result;
+}
+
+static sword iterate_row_data(const oci_t *ocip, const oci_lcr_row_t *row,
+                              ub2 index, char **column_name,
+                              ub2 *column_name_len, void **column_value,
+                              ub2 *column_value_len,ub2 *column_csid, ub2 *column_data_type) {
+  if (row->length <= index) {
+    printf("iterate_row_data: %s",
+           "parameter [ub2 index] must be less than the row size.");
+    return OCI_ERROR;
+  }
+
+  oci_lcr_column_item_t *item = row->columns[index];
+  *column_name = (char *)item->column_name;
+  *column_name_len = item->column_name_len;
+  *column_value = item->column_value;
+  *column_csid = item->column_csid;
+  *column_data_type = item->column_data_type;
+
+  return OCI_SUCCESS;
+}
 
 /*---------------------------------------------------------------------
  * connect_db - Connect to the database and set the env to the given

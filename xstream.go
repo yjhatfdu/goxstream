@@ -322,75 +322,46 @@ type columnInfo struct {
 }
 
 func getLcrRowData(ocip *C.struct_oci, lcrp unsafe.Pointer, valueType valueType, csid, ncsid int, owner string) ([]string, []interface{}, error) {
-	const colCount = 256
-	var col_names **C.oratext
-	var col_names_lens *C.ub2
-	var column_indp *C.OCIInd
-	var column_csetfp *C.ub1
-	var column_flags *C.oraub8
-	//if ci, ok := ownerm[owner]; !ok {
-	//	col_names = (**C.oratext)(unsafe.Pointer(cgo.NewIntN(colCount)))
-	//	col_names_lens = (*C.ub2)(cgo.NewUInt16N(colCount))
-	//	column_indp = (*C.OCIInd)(C.calloc(C.size_t(colCount), C.size_t(unsafe.Sizeof(C.OCIInd(0)))))
-	//	column_csetfp = (*C.ub1)(cgo.NewUInt8N(colCount))
-	//	column_flags = (*C.oraub8)(cgo.NewUInt64N(colCount))
-	//	ownerm[owner] = columnInfo{
-	//		count:     256,
-	//		names:     col_names,
-	//		namesLens: col_names_lens,
-	//		inDP:      column_indp,
-	//		cSetFP:    column_csetfp,
-	//		flags:     column_flags,
-	//	}
-	//} else {
-	//	col_names = ci.names
-	//	col_names_lens = ci.namesLens
-	//	column_indp = ci.inDP
-	//	column_csetfp = ci.cSetFP
-	//	column_flags = ci.flags
-	//}
-
-	var result C.sword
-	var num_cols C.ub2
-	var col_dtype [colCount]C.ub2
-	var column_valuesp [colCount]*C.void
-	var column_alensp [colCount]C.ub2
-	var column_csid [colCount]C.ub2
-	result = C.OCILCRRowColumnInfoGet(
-		ocip.svcp, ocip.errp,
-		C.ushort(valueType), &num_cols,
-		col_names, col_names_lens,
-		(*C.ub2)(unsafe.Pointer(&col_dtype)),
-		(*unsafe.Pointer)((unsafe.Pointer)(&column_valuesp)),
-		column_indp,
-		(*C.ub2)(unsafe.Pointer(&column_alensp)),
-		column_csetfp,
-		column_flags,
-		(*C.ub2)(unsafe.Pointer(&column_csid)),
-		lcrp,
-		C.ushort(colCount),
-		C.OCI_DEFAULT,
-	)
-	if result != C.OCI_SUCCESS {
+	var row *C.oci_lcr_row_t
+	var column_length C.ub2
+	status := C.get_lcr_row_data(ocip, lcrp, C.ub2(valueType), &row, &column_length)
+	if status != C.OCI_SUCCESS {
 		errstr, errcode := getError(ocip.errp)
-		return nil, nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
+		return nil, nil, fmt.Errorf("get_lcr_row_data failed, code:%d, %s", errcode, errstr)
 	} else {
-		columnNames := make([]string, 0)
-		columnValues := make([]interface{}, 0)
-		for i := 0; i < int(uint16(num_cols)); i++ {
-			colName := tostring((*C.uchar)((*[colCount]unsafe.Pointer)(unsafe.Pointer(col_names))[i]),
-				C.ushort((*[colCount]uint16)(unsafe.Pointer(col_names_lens))[i]))
-			columnNames = append(columnNames, colName)
-			colValuep := column_valuesp[i]
-			colDtype := col_dtype[i]
-			csid_l := int(column_csid[i])
-			if csid_l == 0 {
-				csid_l = csid
+		if status == C.OCI_SUCCESS {
+			columnNames := make([]string, 0)
+			columnValues := make([]interface{}, 0)
+
+			for i := 0; i < int(column_length); i++ {
+				var column_name *C.char
+				var column_name_len C.ub2
+				var column_value = unsafe.Pointer(nil)
+				var column_value_len C.ub2
+				var column_csid C.ub2
+				var column_data_type C.ub2
+				status = C.iterate_row_data(ocip, row, C.ub2(i), &column_name, &column_name_len, &column_value, &column_value_len, &column_csid, &column_data_type)
+				if status != C.OCI_SUCCESS {
+					errstr, errcode := getError(ocip.errp)
+					return nil, nil, fmt.Errorf("iterate_row_data failed, code:%d, %s", errcode, errstr)
+				}
+
+				columnNames = append(columnNames, tostring((*C.uchar)(unsafe.Pointer(column_name)), column_name_len))
+
+				csid_l := int(column_csid)
+				if csid_l == 0 {
+					csid_l = csid
+				}
+				colValue := value2interface(ocip.errp, (*C.void)(column_value), column_value_len, csid_l, column_data_type)
+				columnValues = append(columnValues, colValue)
 			}
-			colValue := value2interface(ocip.errp, colValuep, column_alensp[i], csid_l, colDtype)
-			columnValues = append(columnValues, colValue)
+
+			C.free_lcr_row_data(row)
+			return columnNames, columnValues, nil
+		} else {
+			errstr, errcode := getError(ocip.errp)
+			return nil, nil, fmt.Errorf("get_lcr_row_data failed, code:%d, %s", errcode, errstr)
 		}
-		return columnNames, columnValues, nil
 	}
 }
 
