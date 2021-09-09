@@ -234,6 +234,7 @@ static sword iterate_row_data(const oci_t *ocip, const oci_lcr_row_t *row,
   *column_name = (char *)item->column_name;
   *column_name_len = item->column_name_len;
   *column_value = item->column_value;
+  *column_value_len = item->column_value_len;
   *column_csid = item->column_csid;
   *column_data_type = item->column_data_type;
 
