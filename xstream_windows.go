@@ -1,7 +1,8 @@
 package goxstream
 
 // #cgo CFLAGS: -I./include -fPIC
-// #cgo LDFLAGS: -loci
+// #cgo LDFLAGS: -L./instantclient_19_12 -loci
+////-locijdbc19 -lorannzsbb19 -loraocci19 -loraocci19d -loraociei19 -loraons -lociw32
 /* #
 #include "xstrm.c"
 */
@@ -443,11 +444,12 @@ func (x *XStreamConn) scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
 	var number *C.OCINumber = ociNumberFromInt(ocip.errp, int64(s))
 	pos := (*C.ub1)(C.calloc(33, 1))
 	var posl C.ub2
-	if x.lcridVer == V1 {
-		status = C.OCILCRSCNToPosition(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_DEFAULT)
-	} else {
-		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
-	}
+	//if x.lcridVer == V1 {
+	//	status = C.OCILCRSCNToPosition(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_DEFAULT)
+	//} else {
+	//	status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
+	//}
+	status = C.OCILCRSCNToPosition(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_DEFAULT)
 
 	if status != C.OCI_SUCCESS {
 		// todo
