@@ -1,7 +1,7 @@
 package goxstream
 
 // #cgo CFLAGS: -I./include -fPIC
-// #cgo LDFLAGS: -loci
+// #cgo LDFLAGS: -lclntsh
 /* #
 #include "xstrm.c"
 */
