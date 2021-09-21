@@ -64,7 +64,7 @@ typedef struct oci_lcr_column_item {
 
   ub2 column_csid;
 
-  u_char *column_name;
+  ub1 *column_name;
   ub2 column_name_len;
 
   ub2 column_data_type;

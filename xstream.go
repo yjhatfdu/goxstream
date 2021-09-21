@@ -1,3 +1,5 @@
+// +build darwin linux
+
 package goxstream
 
 // #cgo CFLAGS: -I./include -fPIC
