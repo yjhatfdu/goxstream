@@ -1,7 +1,7 @@
 package goxstream
 
 // #cgo CFLAGS: -I./include -fPIC
-// #cgo LDFLAGS: -L./instantclient_19_12 -loci
+// #cgo LDFLAGS: -LC:/oracle/instantclient_19_12 -loci
 ////-locijdbc19 -lorannzsbb19 -loraocci19 -loraocci19d -loraociei19 -loraons -lociw32
 /* #
 #include "xstrm.c"
