@@ -171,6 +171,7 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 			C.travel_chunks(x.ocip)
 		}
 
+		C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
 		return msg, nil
 	}
 	if status == C.OCI_ERROR {
