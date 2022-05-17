@@ -449,7 +449,6 @@ func (x *XStreamConn) scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
 	} else {
 		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
 	}
-	C.free(unsafe.Pointer(number))
 	if status != C.OCI_SUCCESS {
 		// todo
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))
