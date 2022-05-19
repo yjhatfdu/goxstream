@@ -4,17 +4,18 @@ import (
 	"fmt"
 	"github.com/yjhatfdu/goxstream/scn"
 	"log"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestM(t *testing.T) {
-	//user := os.Getenv("XSTREAM_USER")
-	//pwd := os.Getenv("XSTREAM_PASSWORD")
-	//db := os.Getenv("XSTREAM_DBNAME")
-	//server := os.Getenv("XSTREAM_SERVER")
+	user := os.Getenv("XSTREAM_USER")
+	pwd := os.Getenv("XSTREAM_PASSWORD")
+	db := os.Getenv("XSTREAM_DBNAME")
+	server := os.Getenv("XSTREAM_SERVER")
 
-	conn, err := Open("XSTRMADMIN", "Hik9#2Lms3sd", "172.16.1.151:1521/emr_test", "XOUT_", 12)
+	conn, err := Open(user, pwd, db, server, 12)
 	if err != nil {
 		log.Panic(err)
 	}
