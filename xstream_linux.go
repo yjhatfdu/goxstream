@@ -142,7 +142,7 @@ func ToCUCharString(str string) (*C.uchar, C.ushort, func()) {
 
 func (x *XStreamConn) SetSCNLwm(s scn.SCN) error {
 	pos, posl := x.scn2pos(x.ocip, s)
-	defer C.free(unsafe.Pointer(pos))
+	defer pos.Free()
 	status := C.OCIXStreamOutProcessedLWMSet(x.ocip.svcp, x.ocip.errp, pos, posl, C.OCI_DEFAULT)
 	if status == C.OCI_ERROR {
 		errstr, errcode := getError(x.ocip.errp)
@@ -439,21 +439,21 @@ func (x *XStreamConn) pos2SCN(ocip *C.struct_oci, pos *C.ub1, pos_len C.ub2) scn
 	}
 }
 
-func (x *XStreamConn) scn2pos(ocip *C.struct_oci, s scn.SCN) (*C.ub1, C.ub2) {
+func (x *XStreamConn) scn2pos(ocip *C.struct_oci, s scn.SCN) (*cgo.UInt8, C.ub2) {
 	var status C.int
 	var number *C.OCINumber = ociNumberFromInt(ocip.errp, int64(s))
-	pos := (*C.ub1)(C.calloc(33, 1))
+	var buf = cgo.NewUInt8N(C.OCI_LCR_MAX_POSITION_LEN)
 	var posl C.ub2
 	if x.lcridVer == V1 {
-		status = C.OCILCRSCNToPosition(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_DEFAULT)
+		status = C.OCILCRSCNToPosition(ocip.svcp, ocip.errp, (*C.ub1)(buf), &posl, number, C.OCI_DEFAULT)
 	} else {
-		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, pos, &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
+		status = C.OCILCRSCNToPosition2(ocip.svcp, ocip.errp, (*C.ub1)(buf), &posl, number, C.OCI_LCRID_V2, C.OCI_DEFAULT)
 	}
 	if status != C.OCI_SUCCESS {
 		// todo
 		C.ocierror(ocip, C.CString("OCILCRHeaderGet failed"))
 		return nil, 0
 	} else {
-		return pos, posl
+		return buf, posl
 	}
 }
