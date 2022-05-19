@@ -144,7 +144,7 @@ func ToCUCharString(str string) (*C.uchar, C.ushort, func()) {
 func (x *XStreamConn) SetSCNLwm(s scn.SCN) error {
 	pos, posl := x.scn2pos(x.ocip, s)
 	defer pos.Free()
-	status := C.OCIXStreamOutProcessedLWMSet(x.ocip.svcp, x.ocip.errp, pos, posl, C.OCI_DEFAULT)
+	status := C.OCIXStreamOutProcessedLWMSet(x.ocip.svcp, x.ocip.errp, (*C.ub1)(pos), posl, C.OCI_DEFAULT)
 	if status == C.OCI_ERROR {
 		errstr, errcode := getError(x.ocip.errp)
 		return fmt.Errorf("set position lwm failed, code:%d, %s", errcode, errstr)
