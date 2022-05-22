@@ -171,7 +171,7 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 			C.travel_chunks(x.ocip)
 		}
 
-		//C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
+		C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
 		return msg, nil
 	}
 	if status == C.OCI_ERROR {
@@ -179,7 +179,7 @@ func (x *XStreamConn) GetRecord() (Message, error) {
 		return nil, fmt.Errorf("OCIXStreamOutLCRReceive failed, code:%d, %s", errcode, errstr)
 	} else { // status == C.SUCCESS
 		s := x.pos2SCN(x.ocip, (*C.ub1)(fetchlwm), fetchlwm_len)
-		//C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
+		C.OCILCRFree(x.ocip.svcp, x.ocip.errp, lcr, C.OCI_DEFAULT)
 		return &HeartBeat{SCN: s}, nil
 	}
 }

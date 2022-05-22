@@ -442,7 +442,7 @@ static int attach0(oci_t * ocip, conn_info_t *conn, boolean outbound)
     int r=0;
     OCICALL0(ocip,
             OCIXStreamOutAttach(ocip->svcp, ocip->errp, conn->svrnm,
-                              (ub2)conn->svrnmlen, (ub1 *)0, 0, OCI_DEFAULT));
+                              (ub2)conn->svrnmlen, (ub1 *)0, 0, OCIXSTREAM_OUT_ATTACH_APP_FREE_LCR));
     if (r != 0) {
         return r;
     }
